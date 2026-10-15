@@ -44,3 +44,17 @@ def salvar(time_casa_id, time_visitante_id, gols_casa, gols_visitante, data_part
         db_session.rollback()
         flash("Ocorreu um erro, tente novamente", "error")
         print(f"Erro: {e}")
+
+
+def select_partida_por_time(id_time):
+    Time_Casa = aliased(Time)
+    Time_Visitante = aliased(Time)
+
+    partidas_sql = (
+        select(Partida, Time_Casa, Time_Visitante)
+        .join(Time_Casa, Partida.time_casa_id == Time_Casa.id)
+        .join(Time_Visitante, Partida.time_visitante_id == Time_Visitante.id)
+        .where(or_(id_time == Partida.time_casa_id, id_time == Partida.time_visitante_id))
+    )
+    partidas = db_session.execute(partidas_sql).all()
+    return partidas
