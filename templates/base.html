@@ -45,6 +45,10 @@
                        <span class="icone">🔄️</span> Movimentações
                     </a>
                 </li>
+                {% if current_user.id %}
+                    <a href="{{ url_for('logout') }}" class="{{ 'ativo' if 'movimentacao' in request.endpoint else '' }}">
+                    <span class="icone">⛔</span> Sair
+                {% endif %}
             </ul>
         </nav>
 {% endif %}
@@ -58,6 +62,7 @@
                         {% endfor %}
                     </div>
                 {% endif %}
+
             {% endwith %}
 
             {% block conteudo %}

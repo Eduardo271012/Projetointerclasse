@@ -46,7 +46,10 @@ def login():
             flash("Falha na autenticação: Senha incorreta.", "error")
             return redirect(url_for("login"))
 
-    return render_template("login.html")
+    return render_template(
+        "login.html",
+        registro= request.args.get("registro")
+    )
 
 @app.route("/registro", methods=["GET", "POST"])
 def registro():
@@ -83,7 +86,15 @@ def registro():
             flash("Erro ao registrar", "error")
             return render_template("registro")
 
-    return render_template("login.html", registro= request.args.get("registro") == "True")
+    return render_template("registro.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("Você saiu da sua conta.", "sucesso")
+    return redirect(url_for("login"))
 @app.route("/")
 @login_required
 def dashboard():
