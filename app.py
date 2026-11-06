@@ -3,23 +3,102 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from banco import tabela_time, tabela_jogador, tabela_partida, tabela_movimentacao
 from database import *
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 app = Flask(__name__)
+# Secret key apenas para desenvolvimento, em produção deve ser uma chave segura e secreta
 app.secret_key = "chave-secreta-interclasse-2026"
 
+# Configuração do Flask-Login
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Por favor, faça login para acessar esta página."
 
+# Prevenir gargalo "too many connections"
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
+
+# Carregar informações do usuário logado
+@login_manager.user_loader
+def load_user(user_id):
+    return db_session.get(Usuario, int(user_id))
+
+# Interface de autenticação
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email").strip()
+        senha = request.form.get("senha").strip()
+
+        usuario_sql = select(Usuario).where(Usuario.email == email)
+        usuario_resultado = db_session.execute(usuario_sql).scalar()
+
+        if not usuario_resultado:
+            flash("Falha na autenticação: E-mail não encontrado.", "error")
+            return redirect(url_for("login"))
+
+        if usuario_resultado and usuario_resultado.check_password(senha):
+            login_user(usuario_resultado)
+            flash("Login realizado com sucesso!", "success")
+            return redirect(url_for("dashboard"))
+        else:
+            flash("Falha na autenticação: Senha incorreta.", "error")
+            return redirect(url_for("login"))
+
+    return render_template("login.html")
+
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    if request.method == "POST":
+        nome = request.form.get("nome").strip()
+        email = request.form.get("email").strip()
+        senha = request.form.get("senha").strip()
+
+        if not nome and not email and not senha:
+            flash("Todos os campos são obrigatórios.", "error")
+            return redirect(url_for("registro"))
+
+        usuario_sql = select(Usuario).where(Usuario.email == email)
+        usuario_email = db_session.execute(usuario_sql).scalar_one_or_none()
+
+        if usuario_email:
+            flash("Falha no registro: E-mail já cadastrado.", "error")
+            return redirect(url_for("registro"))
+        try:
+            novo_usuario = Usuario(nome=nome, email=email)
+            novo_usuario.set_password(senha)
+            db_session.add(novo_usuario)
+            db_session.commit()
+            flash("Usuário criado com sucesso", "success")
+            return redirect(url_for("login"))
+
+        except SQLAlchemyError as e:
+            print(e)
+            flash("Falha no registro: Erro ao criar usuário no banco.", "error")
+            return render_template("registro")
+
+        except Exception as e:
+            print(f"Erro ao registrar: {e}")
+            flash("Erro ao registrar", "error")
+            return render_template("registro")
+
+    return render_template("login.html", registro= request.args.get("registro") == "True")
 @app.route("/")
+@login_required
 def dashboard():
     # Buscar todos os times no banco
     times = tabela_time.select_quantidade_total()
     jogadores = tabela_jogador.select_quantidade_total()
     partidas = tabela_partida.select_quantidade_total()
+    movimentacoes = tabela_movimentacao.select_quantidade_total()
 
     return render_template(
         "dashboard.html",
         total_jogadores=jogadores,
         total_times=times,
-        total_partidas=partidas
+        total_partidas=partidas,
+        total_movimentacoes=movimentacoes
     )
 
 

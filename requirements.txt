@@ -1,3 +1,6 @@
 Flask>=3.0.0
 pymysql
 sqlalchemy
+flask-login
+werkzeug
+flask-login
