@@ -1,8 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, g
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-
-from banco import tabela_time, tabela_jogador, tabela_partida
+from banco import tabela_time, tabela_jogador, tabela_partida, tabela_movimentacao
 from database import *
 
 app = Flask(__name__)
@@ -26,9 +25,9 @@ def dashboard():
 
 @app.route("/jogadores")
 def listar_jogadores():
-    # Buscar todos os jogadores no banco
     jogadores = tabela_jogador.select_todos()
-    return render_template("jogadores.html", jogadores=jogadores)
+    times = tabela_time.select_todos()
+    return render_template("jogadores.html", jogadores=jogadores, times=times)
 
 
 @app.route("/jogadores/novo", methods=["GET", "POST"])
@@ -68,6 +67,41 @@ def novo_jogador():
     # Carregar o formulario
     return render_template("jogadores.html", jogadores=jogadores, times=times)
 
+
+@app.route("/jogadores/<id_jogador>", methods=["GET", "POST"])
+def editar_jogador(id_jogador):
+    # Buscar o jogador no banco
+    jogador = tabela_jogador.select_um(id_jogador)
+
+    # Salvar as alterações
+    if request.method == "POST":
+        nome = request.form.get("nome").strip()
+        numero_camisa = request.form.get("camisanumero") or None
+        posicao = request.form.get("posicao", "").strip()
+        time_id = request.form.get("time_id") or None
+
+        if not nome:
+            flash("Preencha o nome", "error")
+        elif not numero_camisa:
+            flash("Preencha a turma", "error")
+        elif not posicao:
+            flash("Preencha a posição", "error")
+        elif not time_id:
+            flash("Preencha o time", "error")
+        else:
+            jogador.nome = nome
+            jogador.numero_camisa = numero_camisa
+            jogador.posicao = posicao
+            jogador.time_id = time_id
+            db_session.commit()
+            return redirect(url_for("listar_jogadores"))  # Redireciona após salvar com sucesso
+
+    # Carregar as informações para renderizar a página de edição
+    jogadores = tabela_jogador.select_todos()
+    # BUSCAR OS TIMES PARA PREENCHER O SELECT NA EDIÇÃO
+    times = tabela_time.select_todos()
+
+    return render_template("jogadores.html", jogadores=jogadores, times=times, editar=jogador)
 
 @app.route("/times")
 def listar_times():
@@ -164,6 +198,43 @@ def detalhes_time(id_time):
     jogadores = tabela_jogador.select_por_time(int(id_time))
     partidas = tabela_partida.select_partida_por_time(int(id_time))
     return render_template("time_detalhes.html", time=time, jogadores=jogadores, partidas=partidas)
+
+@app.route("/movimentacao/nova/<int:id_jogador>")
+
+
+
+@app.route("/movimentacao/nova", methods=["GET", "POST"])
+def nova_movimentacao(id_jogador=None):
+    if request.method == "POST":
+        # 1- Pegar informações do formulário
+        jogador_id = request.form.get("jogador_id")
+        time_destino_id = request.form.get("time_destino_id")
+
+        # 2- Verificar informações selecionadas
+        if not jogador_id:
+            flash("Selecione o jogador", "error")
+            return redirect(url_for("nova_movimentacao"))
+        if not time_destino_id:
+            flash("Selecione o time de destino", "error")
+            return redirect(url_for("nova_movimentacao"))
+
+        # 3- Salvar no banco
+        tabela_movimentacao.salvar(jogador_id, time_destino_id)
+        return  redirect(url_for("nova_movimentacao"))
+
+    # Carregar dados para movimentação
+    movimentacoes = tabela_movimentacao.select_todos()
+    jogadores = tabela_jogador.select_todos()
+    times = tabela_time.select_todos()
+
+    return render_template("movimentacoes.html",
+                           movimentacoes=movimentacoes,
+                           jogadores=jogadores,
+                           times=times,
+                           jogador_selecionado_id=id_jogador)
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5002)
